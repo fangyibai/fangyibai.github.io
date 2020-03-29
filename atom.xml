@@ -2,7 +2,7 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://fangyibai.github.io</id>
     <title>方乙百Notes</title>
-    <updated>2020-03-21T16:53:36.103Z</updated>
+    <updated>2020-03-29T15:33:32.178Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://fangyibai.github.io"/>
     <link rel="self" href="https://fangyibai.github.io/atom.xml"/>
@@ -10,6 +10,195 @@
     <logo>https://fangyibai.github.io/images/avatar.png</logo>
     <icon>https://fangyibai.github.io/favicon.ico</icon>
     <rights>All rights reserved 2020, 方乙百Notes</rights>
+    <entry>
+        <title type="html"><![CDATA[Dockerfile语法梳理]]></title>
+        <id>https://fangyibai.github.io/post/dockerfile-clear-up/</id>
+        <link href="https://fangyibai.github.io/post/dockerfile-clear-up/">
+        </link>
+        <updated>2020-03-29T15:19:58.000Z</updated>
+        <content type="html"><![CDATA[<h1 id="dockerfile语法梳理">Dockerfile语法梳理</h1>
+<h2 id="语法梳理">语法梳理</h2>
+<h3 id="from">FROM</h3>
+<pre><code>FROM [--platform=&lt;platform&gt;] &lt;image&gt; [AS &lt;name&gt;]
+
+FROM [--platform=&lt;platform&gt;] &lt;image&gt;[:&lt;tag&gt;] [AS &lt;name&gt;]
+
+FROM [--platform=&lt;platform&gt;] &lt;image&gt;[@&lt;digest&gt;] [AS &lt;name&gt;]
+</code></pre>
+<ol>
+<li>FROM是构建image的基础，一个有效的Dockerfile必须从一个FROM指令开始。</li>
+<li>为了安全，尽量使用官方的image作为base image。</li>
+</ol>
+<h3 id="label">LABEL</h3>
+<pre><code># Set one or more individual labels
+LABEL com.example.version=&quot;0.0.1-beta&quot;
+LABEL vendor1=&quot;ACME Incorporated&quot;
+LABEL vendor2=ZENITH\ Incorporated
+LABEL com.example.release-date=&quot;2015-02-12&quot;
+LABEL com.example.version.is-production=&quot;&quot;
+</code></pre>
+<p>用于定义image的metadata（类似于代码中的注释）。</p>
+<ol>
+<li>标签是一个键值对，以字符串的形式存储。</li>
+<li>可以为一个对象指定多个标签，但是每个键值对在一个对象中必须是唯一的。</li>
+<li>如果相同的键有多个值，则最近写入的值将覆盖所有以前的值。</li>
+<li>尽量合并到一个标签里</li>
+</ol>
+<pre><code># Set multiple labels on one line
+LABEL com.example.version=&quot;0.0.1-beta&quot; com.example.release-date=&quot;2015-02-12&quot;
+</code></pre>
+<pre><code># Set multiple labels at once, using line-continuation characters to break long lines
+LABEL vendor=ACME\ Incorporated \
+      com.example.is-beta= \
+      com.example.is-production=&quot;&quot; \
+      com.example.version=&quot;0.0.1-beta&quot; \
+      com.example.release-date=&quot;2015-02-12&quot;
+</code></pre>
+<h3 id="run">RUN</h3>
+<pre><code>#语法 两种方式
+RUN &lt;command&gt; #以shell形式运行，默认为/bin/sh -c，Windows上默认为cmd /S /C）
+RUN [&quot;executable&quot;, &quot;param1&quot;, &quot;param2&quot;] #例如 RUN [&quot;/bin/bash&quot;, &quot;-c&quot;, &quot;echo hello&quot;]
+</code></pre>
+<p>注意几点：</p>
+<ol>
+<li>为了避免无用分层，合并多条命令为一行。</li>
+<li><code>RUN /bin/bash</code>是JSON格式，必须使用双引号。</li>
+</ol>
+<h3 id="cmd">CMD</h3>
+<pre><code>CMD [&quot;executable&quot;,&quot;param1&quot;,&quot;param2&quot;] #推荐exec方式
+CMD [&quot;param1&quot;,&quot;param2&quot;] #默认参数
+CMD command param1 param2 #shell方式
+</code></pre>
+<ol>
+<li>一个<code>Dockerfile</code>中只能有一条<code>CMD</code>指令。如果有多个，只有最后一个有效。</li>
+<li>如果<code>CMD</code>用于为<code>ENTRYPOINT</code>提供默认参数，那么应该使用JSON数组格式进行指定。</li>
+<li>JSON数组格式必须使用双引号。</li>
+<li>shell方式运行不会执行变量替换。
+<ol>
+<li>例如<code>CMD [&quot;echo&quot;， &quot;$HOME&quot;]</code>不会对<code>$HOME</code>执行变量替换</li>
+<li>如果想要shell处理，使用shell表单或者执行shell。例如<code>CMD [&quot;sh&quot;， &quot;-c&quot;， &quot;echo $HOME&quot;]</code>。</li>
+</ol>
+</li>
+</ol>
+<h3 id="workdir">WORKDIR</h3>
+<ol>
+<li><code>WORKDIR</code>用于对<code>RUN</code>,<code>CMD</code>, <code>ENTRYPOINT</code>设置工作目录。</li>
+<li>如果目录不存在则会自动创建。</li>
+<li><code>WORKDIR</code>可以在<code>Dockerfile</code>中进行多次使用。</li>
+<li><code>WORKDIR</code>可以解析<code>ENV</code>的环境变量。</li>
+<li>如果是一个相对目录，则是<code>WORKDIR</code>之前的目录。</li>
+<li>尽量使用绝对目录。</li>
+</ol>
+<pre><code>WORKDIR /a
+WORKDIR b
+WORKDIR c
+RUN pwd
+#输出为/a/b/c
+</code></pre>
+<h3 id="add">ADD</h3>
+<pre><code>#语法 --chown 只能构建Linux容器的Dockerfiles
+ADD [--chown=&lt;user&gt;:&lt;group&gt;] &lt;src&gt;... &lt;dest&gt;
+ADD [--chown=&lt;user&gt;:&lt;group&gt;] [&quot;&lt;src&gt;&quot;,... &quot;&lt;dest&gt;&quot;]
+</code></pre>
+<ol>
+<li><code>ADD</code> 指令和 <code>COPY</code> 的格式和性质基本一致。但是在 <code>COPY</code> 基础上增加了一些功能。</li>
+<li>如果URL文件受身份验证保护，则需要使用RUN wget，RUN curl，因为ADD指令不支持身份验证。</li>
+<li>当要读取URL远程资源的时候，不推荐使用ADD指令，而是建议使用RUN指令，在RUN指令中执行wget或curl命令。</li>
+<li>如果源文件是个归档文件（压缩文件），则docker会自动帮解压。</li>
+</ol>
+<h3 id="copy">COPY</h3>
+<pre><code>COPY [--chown=&lt;user&gt;:&lt;group&gt;] &lt;src&gt;... &lt;dest&gt;
+COPY [--chown=&lt;user&gt;:&lt;group&gt;] [&quot;&lt;src&gt;&quot;,... &quot;&lt;dest&gt;&quot;]
+</code></pre>
+<ol>
+<li><code>COPY</code> 指令将从构建上下文目录中 <code>&lt;源路径&gt;</code> 的文件/目录复制到新的一层的镜像内的 <code>&lt;目标路径&gt;</code> 位置。</li>
+<li><code>&lt;源路径&gt;</code>路径必须在构建的上下文目录中，不能使用 <code>ADD ../something /something</code>。</li>
+<li><code>&lt;源路径&gt;</code> 可以是多个，甚至可以是通配符，其通配符规则要满足 Go 的 <a href="https://golang.org/pkg/path/filepath/#Match"><code>filepath.Match</code></a> 规则。</li>
+</ol>
+<pre><code>COPY hom* /mydir/
+COPY hom?.txt /mydir/
+</code></pre>
+<ol>
+<li>目标路径不需要事先创建，如果目录不存在会在复制文件前先行创建缺失目录。</li>
+<li>满足同等功能的情况下，推荐使用<code>COPY</code>指令。<code>ADD</code>指令更擅长读取本地tar文件并解压缩。</li>
+</ol>
+<h3 id="env">ENV</h3>
+<pre><code>#语法。ENV指令将环境变量&lt;key&gt;设置为值&lt;value&gt;。
+ENV &lt;key&gt; &lt;value&gt;
+ENV &lt;key&gt;=&lt;value&gt; 
+#example
+ENV myName John Doe
+ENV myDog Rex The Dog
+ENV myCat fluffy
+#example
+ENV myName=&quot;John Doe&quot; myDog=Rex\ The\ Dog \
+    myCat=fluffy
+</code></pre>
+<ol>
+<li>尽量使用evn 增加可维护性</li>
+<li>第一种语法<code>ENV &lt;key&gt; &lt;value&gt;</code>第一个空格之后的整个字符串将被视为<value>包括空白字符。</li>
+<li>第二种语法<code>&lt;key&gt;=&lt;value&gt;</code>允许同时设置多个变量。</li>
+<li>使用<code>docker inspect</code>查看这些值。</li>
+<li>使用<code>docker run --env &lt;key&gt;=&lt;value&gt;</code>更改它们。</li>
+</ol>
+<h3 id="volume">VOLUME</h3>
+<pre><code>VOLUME [&quot;/data&quot;]
+</code></pre>
+<ol>
+<li>在docker运行时，docker会创建一个匿名的<code>volume</code>，并将此<code>volume</code>绑定到容器的/data目录中。</li>
+<li>Dockerfile中的<code>valume</code>每次运行一个容器都会自动创建一个匿名<code>volume</code>。</li>
+<li>如果容器之间要共享数据需要通过<code>docker run -v mydata:/data</code>替代了 Dockerfile 中定义的匿名卷的挂载配置。</li>
+</ol>
+<h3 id="expose">EXPOSE</h3>
+<pre><code>EXPOSE &lt;port&gt; [&lt;port&gt;/&lt;protocol&gt;...]
+</code></pre>
+<ol>
+<li><code>EXPOSE</code> 指令是声明运行时容器提供服务端口，这只是一个声明，在运行时并不会因为这个声明应用就会开启这个端口的服务。</li>
+<li>在 Dockerfile 中写入这样的声明有两个好处。
+<ol>
+<li>帮助镜像使用者理解这个镜像服务的守护端口，以方便配置映射。</li>
+<li>另一个用处则是在运行时使用随机端口映射时，也就是 <code>docker run -P</code> 时，会自动随机映射 <code>EXPOSE</code> 的端口。</li>
+</ol>
+</li>
+<li>可以指定端口监听TCP还是UDP，如果没有指定协议，则默认为TCP。</li>
+</ol>
+<pre><code>EXPOSE 80/tcp #tcp
+EXPOSE 80/udp #udp
+</code></pre>
+<h3 id="entrypoint">ENTRYPOINT</h3>
+<pre><code>ENTRYPOINT [&quot;executable&quot;, &quot;param1&quot;, &quot;param2&quot;] #exec格式
+ENTRYPOINT command param1 param2 #shell格式
+</code></pre>
+<ol>
+<li><code>ENTRYPOINT</code> 的目的和 <code>CMD</code> 一样，都是在指定容器启动程序及参数。</li>
+<li>当指定了 <code>ENTRYPOINT</code> 后，<code>CMD</code> 的含义就发生了改变，不再是直接的运行其命令，而是将 <code>CMD</code> 的内容作为参数传给 <code>ENTRYPOINT</code> 指令<code>&lt;ENTRYPOINT&gt; &quot;&lt;CMD&gt;&quot;</code>。</li>
+</ol>
+<h2 id="nuxt-demo一个简单的dockerfile">nuxt-demo一个简单的Dockerfile</h2>
+<pre><code class="language-shell">yarn create nuxt-app hello-world
+</code></pre>
+<pre><code>FROM node:lts
+ENV HOST 0.0.0.0
+WORKDIR /app
+COPY . /app
+RUN yarn &amp;&amp; yarn build
+CMD [&quot;yarn&quot;, &quot;start&quot;]
+</code></pre>
+<h2 id="官方参考文档">官方参考文档</h2>
+<blockquote>
+<p>Dockerfile文档：https://docs.docker.com/engine/reference/builder/</p>
+<p>docker-library：https://github.com/docker-library</p>
+</blockquote>
+<br/>
+<br/>
+<br/>
+<blockquote>
+<p>本文标题： Dockerfile语法梳理<br>
+本文作者： 方乙百<br>
+本文链接： https://fangyibai.github.io/post/dockerfile-clear-up/<br>
+版权声明： 本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议。转载请保留原文链接及作者！</p>
+</blockquote>
+]]></content>
+    </entry>
     <entry>
         <title type="html"><![CDATA[vagrant搭建开发环境]]></title>
         <id>https://fangyibai.github.io/post/vagrant-dev-env/</id>
